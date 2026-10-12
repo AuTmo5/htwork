@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101820">
+  <title>PLC 编码器数值监控</title>
+  <style>
+    :root {
+      --bg: #101820;
+      --panel: #18252e;
+      --panel-2: #20313a;
+      --line: #354a54;
+      --text: #e9f2f4;
+      --muted: #96abb3;
+      --cyan: #52c9df;
+      --green: #4bd49b;
+      --blue: #72aaff;
+      --amber: #ffc45a;
+      --red: #ff7474;
+      --shadow: 0 12px 28px rgba(0, 0, 0, .2);
+      font-family: "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(82, 201, 223, .13), transparent 32%),
+        var(--bg);
+    }
+    button, input, select { font: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid var(--cyan);
+      outline-offset: 2px;
+    }
+    .topbar, main {
+      width: min(1440px, calc(100% - 48px));
+      margin: auto;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px 0;
+      border-bottom: 1px solid rgba(150, 171, 179, .16);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .mark {
+      display: grid;
+      width: 45px;
+      height: 45px;
+      place-items: center;
+      border: 1px solid rgba(82, 201, 223, .45);
+      border-radius: 12px;
+      color: var(--cyan);
+      background: rgba(82, 201, 223, .1);
+      font-weight: 800;
+    }
+    .eyebrow {
+      margin: 0 0 3px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .14em;
+    }
+    h1 { margin: 0; font-size: clamp(19px, 2.4vw, 26px); }
+    h2, h3 { margin: 0; }
+    .badge, .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 31px;
+      padding: 6px 11px;
+      border: 1px solid rgba(82, 201, 223, .34);
+      border-radius: 999px;
+      color: #b6eff5;
+      background: rgba(82, 201, 223, .08);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px rgba(82, 201, 223, .65);
+    }
+    main { display: grid; gap: 17px; padding: 22px 0 35px; }
+    .grid-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+      gap: 17px;
+    }
+    .panel, .stat {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, .03), transparent 65%), var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .value-panel {
+      position: relative;
+      display: flex;
+      min-height: 270px;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 24px 28px;
+    }
+    .value-panel:after {
+      position: absolute;
+      top: -90px;
+      right: -85px;
+      width: 270px;
+      height: 270px;
+      border: 1px solid rgba(82, 201, 223, .12);
+      border-radius: 50%;
+      box-shadow: 0 0 0 25px rgba(82, 201, 223, .03), 0 0 0 54px rgba(82, 201, 223, .02);
+      content: "";
+      pointer-events: none;
+    }
+    .heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .heading h2, .section-title { font-size: 15px; font-weight: 650; }
+    .subtle { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .big-value {
+      margin-top: 10px;
+      color: #f7fbfc;
+      font-family: "Segoe UI", sans-serif;
+      font-size: clamp(90px, 13vw, 144px);
+      font-weight: 750;
+      letter-spacing: -.07em;
+      line-height: .93;
+      text-shadow: 0 0 35px rgba(82, 201, 223, .17);
+    }
+    .value-scale { margin-left: 9px; color: var(--muted); font-size: 15px; }
+    .track {
+      width: min(450px, 100%);
+      height: 7px;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #2b4049;
+    }
+    .fill {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      transition: width .2s ease;
+    }
+    .value-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .lamps { padding: 22px; }
+    .lamp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .lamp-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 52px;
+      padding: 10px;
+      border: 1px solid rgba(150, 171, 179, .15);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(0, 0, 0, .13);
+    }
+    .lamp {
+      width: 11px;
+      height: 11px;
+      flex: 0 0 auto;
+      border: 1px solid #52656c;
+      border-radius: 50%;
+      background: #35454b;
+    }
+    .lamp.on {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(75, 212, 155, .7);
+    }
+    .lamp.blue.on { border-color: var(--blue); background: var(--blue); box-shadow: 0 0 12px rgba(114, 170, 255, .7); }
+    .lamp.red.on { border-color: var(--red); background: var(--red); box-shadow: 0 0 12px rgba(255, 116, 116, .7); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 11px;
+    }
+    .stat { padding: 15px 16px; }
+    .stat-label { color: var(--muted); font-size: 12px; }
+    .stat-value {
+      overflow: hidden;
+      margin-top: 9px;
+      font-size: 20px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stat-value.small { font-size: 14px; }
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+      gap: 17px;
+    }
+    .controls, .signals, .trend, .logs { padding: 21px; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 17px; }
+    .button {
+      display: inline-flex;
+      min-height: 42px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border: 1px solid #435963;
+      border-radius: 9px;
+      color: var(--text);
+      background: #243741;
+      cursor: pointer;
+      transition: transform .15s, background .15s, border-color .15s;
+    }
+    .button:hover:not(:disabled) { transform: translateY(-1px); border-color: #708892; background: #2d4651; }
+    .button:disabled { cursor: not-allowed; opacity: .42; }
+    .button.primary { border-color: rgba(75, 212, 155, .43); color: #c9ffe8; background: rgba(75, 212, 155, .12); }
+    .button.danger { border-color: rgba(255, 116, 116, .43); color: #ffd5d5; background: rgba(255, 116, 116, .1); }
+    .button.forward { border-color: rgba(82, 201, 223, .43); color: #cef8fc; background: rgba(82, 201, 223, .1); }
+    .button.reverse { border-color: rgba(114, 170, 255, .43); color: #dceaff; background: rgba(114, 170, 255, .1); }
+    .compact { min-height: 34px; padding: 6px 10px; font-size: 12px; }
+    .divider { height: 1px; margin: 20px 0 16px; background: rgba(150, 171, 179, .15); }
+    .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    label.field-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+    select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid #435963;
+      border-radius: 8px;
+      color: var(--text);
+      background: #21343e;
+    }
+    .range-row { display: flex; align-items: center; gap: 10px; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); }
+    output { min-width: 72px; color: var(--text); font-size: 12px; text-align: right; }
+    .check-row { display: flex; align-items: center; gap: 9px; margin-top: 16px; font-size: 13px; }
+    .check-row input { width: 17px; height: 17px; accent-color: var(--green); }
+    .check-note { margin: 6px 0 0 27px; color: var(--muted); font-size: 11px; }
+    .signal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-top: 16px; }
+    .signal {
+      padding: 13px;
+      border: 1px solid rgba(150, 171, 179, .16);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, .13);
+    }
+    .signal-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+    .level { margin-top: 8px; color: var(--cyan); font: 700 25px Consolas, monospace; }
+    .level.high { color: var(--green); }
+    .debug-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
+    .debug-row .button { width: 100%; }
+    .connection {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 17px;
+      padding: 12px;
+      border: 1px solid rgba(75, 212, 155, .24);
+      border-radius: 10px;
+      background: rgba(75, 212, 155, .05);
+    }
+    .connection .dot { background: var(--green); box-shadow: 0 0 9px rgba(75, 212, 155, .6); }
+    .connection-title { font-size: 12px; }
+    .connection-note { margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .canvas-wrap { height: 205px; margin-top: 14px; border: 1px solid rgba(150, 171, 179, .14); border-radius: 10px; background: rgba(0, 0, 0, .13); }
+    canvas { display: block; width: 100%; height: 100%; }
+    .trend-caption { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 11px; }
+    .log-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .log-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .table-wrap { max-height: 270px; overflow: auto; margin-top: 14px; border: 1px solid rgba(150, 171, 179, .14); border-radius: 9px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid rgba(150, 171, 179, .12); vertical-align: top; }
+    th { position: sticky; top: 0; color: var(--muted); background: #1b2c35; font-weight: 550; }
+    td { color: #d8e2e5; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .empty { color: var(--muted); text-align: center; }
+    .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; }
+    kbd { padding: 2px 6px; border: 1px solid #455a63; border-radius: 5px; color: var(--text); background: #1f3039; }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 3;
+      max-width: calc(100vw - 40px);
+      padding: 12px 16px;
+      border: 1px solid rgba(82, 201, 223, .4);
+      border-radius: 10px;
+      background: #203740;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+    .toast[hidden] { display: none; }
+    @media (max-width: 980px) {
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .content { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 700px) {
+      .topbar, main { width: min(100% - 30px, 1440px); }
+      .topbar { padding: 17px 0; }
+      main { padding: 15px 0 25px; }
+      .grid-overview { grid-template-columns: 1fr; }
+      .value-panel { min-height: 245px; padding: 20px; }
+      .controls, .signals, .trend, .logs, .lamps { padding: 17px; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .stat:last-child { grid-column: span 2; }
+    }
+    @media (max-width: 440px) {
+      .topbar { align-items: flex-start; }
+      .badge { white-space: normal; }
+      .settings { grid-template-columns: 1fr; }
+      .button-row .button { flex: 1 1 calc(50% - 10px); }
+      .log-head { flex-direction: column; }
+      th, td { padding: 9px 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">PLC</div>
+      <div>
+        <p class="eyebrow">设备状态监控 / ENCODER</p>
+        <h1>增量式编码器监控</h1>
+      </div>
+    </div>
+    <div class="badge" aria-label="当前为浏览器模拟模式"><span class="dot" aria-hidden="true"></span>浏览器模拟模式</div>
+  </header>
+
+  <main>
+    <section class="grid-overview" aria-label="设备概览">
+      <article class="panel value-panel">
+        <div class="heading">
+          <div>
+            <h2>当前编码器数值</h2>
+            <p class="subtle">数值范围 1–9 · 增量式正交信号</p>
+          </div>
+          <span class="chip" id="runChip">已停止</span>
+        </div>
+        <div>
+          <span class="big-value" id="value" aria-live="polite" aria-atomic="true">1</span><span class="value-scale">/ 9</span>
+          <div class="track" role="progressbar" aria-label="编码器数值位置" aria-valuemin="1" aria-valuemax="9" aria-valuenow="1"><div class="fill" id="fill"></div></div>
+        </div>
+        <div class="value-footer"><span>当前方向：<strong id="direction">待机</strong></span><span id="clock">--:--:--</span></div>
+      </article>
+      <article class="panel lamps">
+        <h2 class="section-title">运行指示</h2>
+        <p class="subtle">指示灯反映当前运行与信号状态</p>
+        <div class="lamp-grid">
+          <div class="lamp-item"><span class="lamp" id="lampRun"></span>运行</div>
+          <div class="lamp-item"><span class="lamp blue" id="lampStop"></span>停止</div>
+          <div class="lamp-item"><span class="lamp" id="lampFwd"></span>正转</div>
+          <div class="lamp-item"><span class="lamp blue" id="lampRev"></span>反转</div>
+          <div class="lamp-item"><span class="lamp red" id="lampAlarm"></span>报警 / 非法跳变</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="stats" aria-label="运行统计">
+      <article class="stat"><div class="stat-label">有效脉冲数</div><div class="stat-value" id="valid">0</div></article>
+      <article class="stat"><div class="stat-label">非法跳变数</div><div class="stat-value" id="invalid">0</div></article>
+      <article class="stat"><div class="stat-label">运行时间</div><div class="stat-value" id="runtime">00:00</div></article>
+      <article class="stat"><div class="stat-label">最后一次动作</div><div class="stat-value small" id="lastAction">—</div></article>
+      <article class="stat"><div class="stat-label">工作模式 / 连接状态</div><div class="stat-value small" id="modeText">循环模式 · 模拟数据</div></article>
+    </section>
+
+    <section class="content" aria-label="控制与信号">
+      <article class="panel controls">
+        <div class="heading">
+          <div>
+            <h2 class="section-title">设备控制</h2>
+            <p class="subtle">启动自动模拟；单步操作在停止状态下也可使用</p>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="button primary" id="start" type="button">▶ 启动</button>
+          <button class="button danger" id="stop" type="button" disabled>■ 停止</button>
+          <button class="button" id="reset" type="button">↺ 复位</button>
+          <button class="button forward" id="forward" type="button">＋ 正转一步</button>
+          <button class="button reverse" id="reverse" type="button">－ 反转一步</button>
+        </div>
+        <div class="divider"></div>
+        <div class="settings">
+          <div>
+            <label class="field-label" for="mode">边界模式</label>
+            <select id="mode">
+              <option value="loop">循环模式（9 → 1，1 → 9）</option>
+              <option value="limit">限位模式（停留在边界）</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="speed">模拟速度</label>
+            <div class="range-row"><input id="speed" type="range" min="1" max="20" step="1" value="4"><output id="speedOut" for="speed">4 脉冲/秒</output></div>
+          </div>
+        </div>
+        <p class="subtle">速度范围 1–20 个有效相位跳变/秒；设置会保存到本机浏览器。</p>
+        <label class="check-row" for="auto"><input id="auto" type="checkbox">自动模拟脉冲（正转）</label>
+        <p class="check-note" id="autoNote">未启用。勾选后自动启动模拟运行。</p>
+      </article>
+
+      <article class="panel signals">
+        <h2 class="section-title">A / B 相信号</h2>
+        <p class="subtle">调试输入先经过软件去抖，再送入四状态正交解码器</p>
+        <div class="signal-grid">
+          <div class="signal"><div class="signal-head"><span>A 相</span><span id="aLabel">低电平</span></div><div class="level" id="aLevel" aria-live="polite">0</div></div>
+          <div class="signal"><div class="signal-head"><span>B 相</span><span id="bLabel">低电平</span></div><div class="level" id="bLevel" aria-live="polite">0</div></div>
+        </div>
+        <div class="debug-row">
+          <button class="button" id="toggleA" type="button" aria-pressed="false">切换 A 相</button>
+          <button class="button" id="toggleB" type="button" aria-pressed="false">切换 B 相</button>
+        </div>
+        <div class="connection" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <div><div class="connection-title">连接状态：本地模拟源就绪</div><div class="connection-note">未连接 PLC；真实数据由后续数据适配器接入</div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel trend" aria-labelledby="trendTitle">
+      <div class="heading"><div><h2 class="section-title" id="trendTitle">数值趋势</h2><p class="subtle">最近 60 次有效相位变化</p></div><span class="chip">范围 1–9</span></div>
+      <div class="canvas-wrap"><canvas id="chart" aria-label="编码器最近数值趋势图"></canvas></div>
+      <div class="trend-caption"><span>低位 1</span><span id="trendNow">当前值：1</span><span>高位 9</span></div>
+    </section>
+
+    <section class="panel logs" aria-labelledby="logsTitle">
+      <div class="log-head">
+        <div><h2 class="section-title" id="logsTitle">操作事件日志</h2><p class="subtle">记录操作、解码结果和非法跳变，最多保留 250 条</p></div>
+        <div class="log-actions"><button class="button compact" id="export" type="button">导出 CSV</button><button class="button compact" id="clear" type="button">清空日志</button></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th scope="col">时间</th><th scope="col">事件</th><th scope="col">详情</th></tr></thead><tbody id="rows"><tr><td class="empty" colspan="3">暂无操作记录</td></tr></tbody></table></div>
+    </section>
+
+    <div class="footer"><span>快捷键：<kbd>→</kbd> 正转一步　<kbd>←</kbd> 反转一步　<kbd>R</kbd> 复位</span><span>模拟数据仅用于界面演示与逻辑验证</span></div>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    "use strict";
+
+    /* 四状态正交解码器：00→01→11→10→00 为正转，反向为反转。 */
+    class QuadratureDecoder {
+      constructor(mode) {
+        this.mode = mode === "limit" ? "limit" : "loop";
+        this.reset();
+      }
+      reset() {
+        this.value = 1;
+        this.previous = 0;
+        this.valid = 0;
+        this.invalid = 0;
+      }
+      setMode(mode) { this.mode = mode === "limit" ? "limit" : "loop"; }
+      feed(a, b, timestamp) {
+        var current = (a ? 2 : 0) | (b ? 1 : 0);
+        var previous = this.previous;
+        if (current === previous) return null;
+        var table = [
+          [0, 1, -1, null],
+          [-1, 0, null, 1],
+          [1, null, 0, -1],
+          [null, -1, 1, 0]
+        ];
+        var delta = table[previous][current];
+        this.previous = current;
+        if (delta === null) {
+          this.invalid += 1;
+          return { type: "invalid", from: previous, to: current, timestamp: timestamp };
+        }
+        var before = this.value;
+        this.valid += 1;
+        this.value += delta;
+        if (this.value > 9) this.value = this.mode === "loop" ? 1 : 9;
+        if (this.value < 1) this.value = this.mode === "loop" ? 9 : 1;
+        return { type: "valid", delta: delta, before: before, value: this.value, timestamp: timestamp };
+      }
+    }
+
+    /* 数据适配器：未来 WebSocket、REST 或 PLC 网关只需调用 publish({a,b,timestamp})。 */
+    class EncoderDataAdapter {
+      constructor(onSample, source) { this.onSample = onSample; this.source = source || "external"; }
+      publish(sample) {
+        if (!sample || typeof sample !== "object") return false;
+        var a = sample.a === true || sample.a === 1 ? 1 : sample.a === false || sample.a === 0 ? 0 : null;
+        var b = sample.b === true || sample.b === 1 ? 1 : sample.b === false || sample.b === 0 ? 0 : null;
+        if (a === null || b === null) return false;
+        this.onSample({ a: a, b: b, timestamp: Number.isFinite(sample.timestamp) ? sample.timestamp : Date.now(), source: this.source });
+        return true;
+      }
+    }
+
+    var KEY = "plcEncoderMonitor.settings.v1";
+    var settings = { mode: "loop", speed: 4 };
+    try {
+      var saved = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (saved && saved.mode === "limit") settings.mode = "limit";
+      if (saved && Number.isInteger(saved.speed) && saved.speed >= 1 && saved.speed <= 20) settings.speed = saved.speed;
+    } catch (error) {}
+
+    var state = {
+      running: false,
+      auto: false,
+      mode: settings.mode,
+      speed: settings.speed,
+      a: 0,
+      b: 0,
+      direction: 0,
+      lastPulse: 0,
+      lastAction: null,
+      alarmUntil: 0,
+      startedAt: null,
+      elapsed: 0,
+      trend: [1]
+    };
+    var decoder = new QuadratureDecoder(state.mode);
+    var logs = [];
+    var debounceTimer = 0;
+    var autoTimer = 0;
+    var toastTimer = 0;
+    var forwardSequence = [0, 1, 3, 2];
+
+    var $ = function(id) { return document.getElementById(id); };
+    var ui = {
+      value: $("value"), fill: $("fill"), runChip: $("runChip"), direction: $("direction"), clock: $("clock"),
+      valid: $("valid"), invalid: $("invalid"), runtime: $("runtime"), lastAction: $("lastAction"), modeText: $("modeText"),
+      start: $("start"), stop: $("stop"), reset: $("reset"), forward: $("forward"), reverse: $("reverse"),
+      mode: $("mode"), speed: $("speed"), speedOut: $("speedOut"), auto: $("auto"), autoNote: $("autoNote"),
+      aLevel: $("aLevel"), bLevel: $("bLevel"), aLabel: $("aLabel"), bLabel: $("bLabel"), toggleA: $("toggleA"), toggleB: $("toggleB"),
+      chart: $("chart"), trendNow: $("trendNow"), rows: $("rows"), toast: $("toast")
+    };
+
+    function saveSettings() {
+      try { localStorage.setItem(KEY, JSON.stringify({ mode: state.mode, speed: state.speed })); } catch (error) {}
+    }
+    function runtimeSeconds() {
+      return state.elapsed + (state.running && state.startedAt !== null ? (performance.now() - state.startedAt) / 1000 : 0);
+    }
+    function durationText(seconds) {
+      var n = Math.max(0, Math.floor(seconds));
+      var h = Math.floor(n / 3600);
+      var m = Math.floor((n % 3600) / 60);
+      var s = n % 60;
+      return (h ? String(h).padStart(2, "0") + ":" : "") + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    }
+    function timeText(timestamp) {
+      return timestamp ? new Date(timestamp).toLocaleTimeString("zh-CN", { hour12: false }) : "—";
+    }
+    function addLog(event, detail, timestamp) {
+      logs.unshift({
+        time: new Date(timestamp || Date.now()).toLocaleString("zh-CN", { hour12: false }),
+        event: String(event),
+        detail: String(detail)
+      });
+      if (logs.length > 250) logs.length = 250;
+      renderLogs();
+    }
+    function renderLogs() {
+      ui.rows.replaceChildren();
+      if (!logs.length) {
+        var emptyRow = document.createElement("tr");
+        var emptyCell = document.createElement("td");
+        emptyCell.colSpan = 3;
+        emptyCell.className = "empty";
+        emptyCell.textContent = "暂无操作记录";
+        emptyRow.appendChild(emptyCell);
+        ui.rows.appendChild(emptyRow);
+        return;
+      }
+      logs.forEach(function(item) {
+        var row = document.createElement("tr");
+        [item.time, item.event, item.detail].forEach(function(text) {
+          var cell = document.createElement("td");
+          cell.textContent = text;
+          row.appendChild(cell);
+        });
+        ui.rows.appendChild(row);
+      });
+    }
+    function showToast(text) {
+      ui.toast.textContent = text;
+      ui.toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function() { ui.toast.hidden = true; }, 2300);
+    }
+    function lamp(id, active) { $(id).classList.toggle("on", Boolean(active)); }
+
+    function drawTrend() {
+      var canvas = ui.chart;
+      var rect = canvas.getBoundingClientRect();
+      var ratio = window.devicePixelRatio || 1;
+      var width = Math.max(280, rect.width);
+      var height = Math.max(160, rect.height);
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      var ctx = canvas.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      var left = 36, right = width - 14, top = 14, bottom = height - 22;
+      ctx.strokeStyle = "#344952";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      for (var i = 0; i < 5; i += 1) {
+        var y = top + (bottom - top) * i / 4;
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#91a5ad";
+      ctx.font = "11px sans-serif";
+      [9, 7, 5, 3, 1].forEach(function(v, i) { ctx.fillText(String(v), 14, top + (bottom - top) * i / 4 + 4); });
+      var data = state.trend.slice(-60);
+      var points = data.map(function(v, index) {
+        var x = data.length <= 1 ? right : left + index / (data.length - 1) * (right - left);
+        var y = bottom - (v - 1) / 8 * (bottom - top);
+        return { x: x, y: y };
+      });
+      if (points.length) {
+        ctx.beginPath();
+        points.forEach(function(p, index) { if (index) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+        ctx.strokeStyle = "#52c9df";
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+        var last = points[points.length - 1];
+        ctx.beginPath(); ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = "#4bd49b"; ctx.fill();
+      }
+    }
+
+    function render() {
+      var now = Date.now();
+      var activeDirection = state.lastPulse && now - state.lastPulse < 1500 ? state.direction : 0;
+      ui.value.textContent = String(decoder.value);
+      ui.fill.style.width = ((decoder.value - 1) / 8 * 100) + "%";
+      document.querySelector("[role=progressbar]").setAttribute("aria-valuenow", String(decoder.value));
+      ui.runChip.textContent = state.running ? "运行中" : "已停止";
+      ui.direction.textContent = activeDirection > 0 ? "正转" : activeDirection < 0 ? "反转" : "待机";
+      ui.clock.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+      ui.valid.textContent = String(decoder.valid);
+      ui.invalid.textContent = String(decoder.invalid);
+      ui.runtime.textContent = durationText(runtimeSeconds());
+      ui.lastAction.textContent = timeText(state.lastAction);
+      ui.modeText.textContent = (state.mode === "loop" ? "循环模式" : "限位模式") + " · 模拟数据";
+      ui.start.disabled = state.running;
+      ui.stop.disabled = !state.running;
+      ui.mode.value = state.mode;
+      ui.speed.value = String(state.speed);
+      ui.speedOut.textContent = String(state.speed) + " 脉冲/秒";
+      ui.auto.checked = state.auto;
+      ui.autoNote.textContent = state.auto ? (state.running ? "自动模拟运行中，方向为正转。" : "已启用，启动设备后继续模拟。") : "未启用。勾选后自动启动模拟运行。";
+      ui.aLevel.textContent = String(state.a);
+      ui.bLevel.textContent = String(state.b);
+      ui.aLevel.classList.toggle("high", state.a === 1);
+      ui.bLevel.classList.toggle("high", state.b === 1);
+      ui.aLabel.textContent = state.a ? "高电平" : "低电平";
+      ui.bLabel.textContent = state.b ? "高电平" : "低电平";
+      ui.toggleA.setAttribute("aria-pressed", String(state.a === 1));
+      ui.toggleB.setAttribute("aria-pressed", String(state.b === 1));
+      lamp("lampRun", state.running);
+      lamp("lampStop", !state.running);
+      lamp("lampFwd", activeDirection > 0);
+      lamp("lampRev", activeDirection < 0);
+      lamp("lampAlarm", now < state.alarmUntil);
+      ui.trendNow.textContent = "当前值：" + String(decoder.value);
+      drawTrend();
+    }
+
+    function receive(sample) {
+      state.a = sample.a;
+      state.b = sample.b;
+      render();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        var result = decoder.feed(sample.a, sample.b, sample.timestamp);
+        if (!result) return;
+        state.lastAction = result.timestamp;
+        state.lastPulse = Date.now();
+        if (result.type === "valid") {
+          state.direction = result.delta;
+          state.trend.push(result.value);
+          if (state.trend.length > 60) state.trend.shift();
+          var dir = result.delta > 0 ? "正转" : "反转";
+          addLog("有效脉冲（" + (sample.source === "simulation" ? "模拟" : "外部") + "）",
+            result.before === result.value ? dir + "触发，数值限位在 " + result.value : dir + " " + result.before + " → " + result.value,
+            result.timestamp);
+        } else {
+          state.alarmUntil = Date.now() + 1800;
+          addLog("非法跳变", "A/B 状态 " + result.from + " → " + result.to + "，已忽略计数", result.timestamp);
+        }
+        render();
+      }, 10);
+    }
+    var adapter = new EncoderDataAdapter(receive, "simulation");
+    function send(a, b) { adapter.publish({ a: a, b: b, timestamp: Date.now() }); }
+    function nextPhase(direction) {
+      var current = (state.a ? 2 : 0) | (state.b ? 1 : 0);
+      var index = forwardSequence.indexOf(current);
+      if (index < 0) index = 0;
+      var nextIndex = (index + (direction > 0 ? 1 : 3)) % 4;
+      var next = forwardSequence[nextIndex];
+      return { a: (next >> 1) & 1, b: next & 1 };
+    }
+    function step(direction) {
+      var next = nextPhase(direction);
+      send(next.a, next.b);
+    }
+    function syncAuto() {
+      clearInterval(autoTimer);
+      autoTimer = 0;
+      if (state.running && state.auto) autoTimer = setInterval(function() { step(1); }, 1000 / state.speed);
+    }
+    function start() {
+      if (state.running) return;
+      state.running = true;
+      state.startedAt = performance.now();
+      addLog("启动", state.auto ? "启动监控并运行自动模拟" : "启动监控");
+      syncAuto(); render(); showToast("监控已启动。");
+    }
+    function stop() {
+      if (!state.running) return;
+      state.elapsed += (performance.now() - state.startedAt) / 1000;
+      state.startedAt = null;
+      state.running = false;
+      addLog("停止", "停止监控与自动模拟脉冲");
+      syncAuto(); render(); showToast("监控已停止。");
+    }
+    function reset() {
+      clearTimeout(debounceTimer);
+      clearInterval(autoTimer);
+      state.running = false; state.auto = false; state.startedAt = null; state.elapsed = 0;
+      state.a = 0; state.b = 0; state.direction = 0; state.lastPulse = 0; state.alarmUntil = 0;
+      state.trend = [1]; state.lastAction = Date.now();
+      decoder.reset(); send(0, 0);
+      addLog("复位", "数值恢复为 1，计数与运行时间清零", state.lastAction);
+      render(); showToast("已复位：数值 1，运行状态停止。");
+    }
+    function togglePhase(name) {
+      if (name === "A") state.a = state.a ? 0 : 1;
+      else state.b = state.b ? 0 : 1;
+      send(state.a, state.b);
+      addLog("相位调试", name + " 相切换为" + ((name === "A" ? state.a : state.b) ? "高电平" : "低电平"));
+      render();
+    }
+
+    ui.start.addEventListener("click", start);
+    ui.stop.addEventListener("click", stop);
+    ui.reset.addEventListener("click", reset);
+    ui.forward.addEventListener("click", function() { step(1); addLog("手动步进", "请求正转一步"); showToast("已发送正转一步信号。"); });
+    ui.reverse.addEventListener("click", function() { step(-1); addLog("手动步进", "请求反转一步"); showToast("已发送反转一步信号。"); });
+    ui.toggleA.addEventListener("click", function() { togglePhase("A"); });
+    ui.toggleB.addEventListener("click", function() { togglePhase("B"); });
+    ui.mode.addEventListener("change", function() {
+      state.mode = ui.mode.value === "limit" ? "limit" : "loop";
+      decoder.setMode(state.mode); saveSettings(); addLog("模式切换", state.mode === "loop" ? "循环模式" : "限位模式"); render();
+    });
+    ui.speed.addEventListener("input", function() {
+      var value = Number(ui.speed.value);
+      if (!Number.isInteger(value) || value < 1 || value > 20) return;
+      state.speed = value; syncAuto(); render();
+    });
+    ui.speed.addEventListener("change", function() { saveSettings(); addLog("速度设置", String(state.speed) + " 脉冲/秒"); });
+    ui.auto.addEventListener("change", function() {
+      state.auto = ui.auto.checked;
+      if (state.auto && !state.running) { state.running = true; state.startedAt = performance.now(); }
+      addLog("自动模拟", state.auto ? "启用正转自动模拟" : "关闭自动模拟");
+      syncAuto(); render(); showToast(state.auto ? "自动模拟已启动，方向为正转。" : "自动模拟已关闭。");
+    });
+    $("clear").addEventListener("click", function() { logs = []; renderLogs(); showToast("操作日志已清空。"); });
+    $("export").addEventListener("click", function() {
+      var rows = [["时间", "事件", "详情"]].concat(logs.map(function(item) { return [item.time, item.event, item.detail]; }));
+      var csv = "\uFEFF" + rows.map(function(row) {
+        return row.map(function(cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(",");
+      }).join("\r\n");
+      var url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      var link = document.createElement("a");
+      link.href = url; link.download = "encoder-log-" + new Date().toISOString().slice(0, 10) + ".csv";
+      document.body.appendChild(link); link.click(); link.remove(); setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+      showToast("CSV 日志已导出。");
+    });
+    document.addEventListener("keydown", function(event) {
+      var target = event.target;
+      var editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].indexOf(target.tagName) >= 0);
+      if (editing || event.repeat) return;
+      if (event.key === "ArrowRight") { event.preventDefault(); step(1); addLog("键盘步进", "快捷键请求正转一步"); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); step(-1); addLog("键盘步进", "快捷键请求反转一步"); }
+      else if (event.key.toLowerCase() === "r") reset();
+    });
+    window.addEventListener("resize", drawTrend);
+    setInterval(render, 250);
+    ui.mode.value = state.mode;
+    ui.speed.value = String(state.speed);
+    render();
+    addLog("系统就绪", "浏览器模拟模式；监控已停止，当前数值为 1");
+  </script>
+</body>
+</html>
